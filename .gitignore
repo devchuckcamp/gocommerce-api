@@ -1,0 +1,66 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Build output
+bin/
+dist/
+build/
+
+# Logs
+*.log
+server.log
+logs/
+
+# Database files (for local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+.env.bak
+
+# Temporary files
+tmp/
+temp/
+
+# Docker volumes
+docker-data/
+
+# Test cache
+.test-cache/
+coverage.txt
+*.coverprofile

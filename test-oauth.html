@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4285f4;
+            padding-bottom: 10px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #357ae8;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #4285f4;
+            border-radius: 4px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .result h3 {
+            margin-top: 0;
+            color: #4285f4;
+        }
+        pre {
+            background-color: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            border-left-color: #ea4335;
+        }
+        .error h3 {
+            color: #ea4335;
+        }
+        .user-info {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .user-info p {
+            margin: 5px 0;
+        }
+        .token-info {
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Google OAuth Test</h1>
+        <p>Test the Google OAuth integration for the Go E-commerce API</p>
+        
+        <button onclick="startOAuth()">🚀 Sign in with Google</button>
+        <button onclick="clearResults()">🗑️ Clear Results</button>
+        
+        <div id="result" class="result">
+            <h3>Result</h3>
+            <div id="resultContent"></div>
+        </div>
+
+        <div id="callbackResult" class="result">
+            <h3>OAuth Callback Response</h3>
+            <div id="callbackContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api/v1';
+
+        // Check if we're on the callback
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                showError('OAuth Error: ' + error + ' - ' + urlParams.get('error_description'));
+                return;
+            }
+            
+            if (code) {
+                handleCallback();
+            }
+        });
+
+        async function startOAuth() {
+            try {
+                showResult('Fetching Google OAuth URL...', false);
+                
+                const response = await fetch(`${API_URL}/auth/google`);
+                const data = await response.json();
+                
+                if (data.data && data.data.url) {
+                    const { url, state } = data.data;
+                    
+                    // Save state for verification
+                    sessionStorage.setItem('oauth_state', state);
+                    
+                    showResult(`
+                        <p><strong>Authorization URL Generated!</strong></p>
+                        <p>State: <code>${state}</code></p>
+                        <p>Redirecting to Google in 2 seconds...</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, false);
+                    
+                    // Redirect to Google after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = url;
+                    }, 2000);
+                } else {
+                    showError('Invalid response from server: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                showError('Error: ' + error.message);
+            }
+        }
+
+        async function handleCallback() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const code = urlParams.get('code');
+                const state = urlParams.get('state');
+                const savedState = sessionStorage.getItem('oauth_state');
+                
+                showCallbackResult('Processing OAuth callback...', false);
+                
+                // Verify state
+                if (state !== savedState) {
+                    showCallbackError('CSRF Warning: State mismatch! Expected: ' + savedState + ', Got: ' + state);
+                    return;
+                }
+                
+                // The backend automatically handles the code exchange
+                // We just need to call the callback endpoint
+                const response = await fetch(`${API_URL}/auth/google/callback?code=${code}&state=${state}`);
+                const data = await response.json();
+                
+                if (data.data) {
+                    const { user, access_token, refresh_token, expires_at } = data.data;
+                    
+                    // Store tokens
+                    localStorage.setItem('access_token', access_token);
+                    localStorage.setItem('refresh_token', refresh_token);
+                    
+                    showCallbackResult(`
+                        <div class="user-info">
+                            <h4>✅ Login Successful!</h4>
+                            <p><strong>User ID:</strong> ${user.id}</p>
+                            <p><strong>Email:</strong> ${user.email}</p>
+                            <p><strong>Name:</strong> ${user.first_name} ${user.last_name}</p>
+                            <p><strong>Email Verified:</strong> ${user.email_verified ? '✅ Yes' : '❌ No'}</p>
+                            <p><strong>Account Active:</strong> ${user.active ? '✅ Yes' : '❌ No'}</p>
+                        </div>
+                        <div class="token-info">
+                            <p><strong>Access Token:</strong></p>
+                            <pre>${access_token.substring(0, 50)}...</pre>
+                            <p><strong>Refresh Token:</strong></p>
+                            <pre>${refresh_token.substring(0, 50)}...</pre>
+                            <p><strong>Expires At:</strong> ${expires_at}</p>
+                        </div>
+                        <h4>Full Response:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `, false);
+                    
+                    // Clean up URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    sessionStorage.removeItem('oauth_state');
+                } else {
+                    showCallbackError('Login failed: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                showCallbackError('Error: ' + error.message);
+            }
+        }
+
+        function showResult(content, isError = false) {
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            resultDiv.classList.add('show');
+            if (isError) {
+                resultDiv.classList.add('error');
+            } else {
+                resultDiv.classList.remove('error');
+            }
+            resultContent.innerHTML = content;
+        }
+
+        function showError(message) {
+            showResult(message, true);
+        }
+
+        function showCallbackResult(content, isError = false) {
+            const resultDiv = document.getElementById('callbackResult');
+            const resultContent = document.getElementById('callbackContent');
+            resultDiv.classList.add('show');
+            if (isError) {
+                resultDiv.classList.add('error');
+            } else {
+                resultDiv.classList.remove('error');
+            }
+            resultContent.innerHTML = content;
+        }
+
+        function showCallbackError(message) {
+            showCallbackResult(message, true);
+        }
+
+        function clearResults() {
+            document.getElementById('result').classList.remove('show');
+            document.getElementById('callbackResult').classList.remove('show');
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            sessionStorage.removeItem('oauth_state');
+        }
+    </script>
+</body>
+</html>

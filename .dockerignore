@@ -1,0 +1,44 @@
+# Docker ignore file for Go application
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+*.log
+server.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test coverage
+*.coverprofile
+coverage.html
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+*_test.go
+test-oauth.html
+
+# Docker
+.dockerignore
+docker-compose.yml
+Dockerfile
