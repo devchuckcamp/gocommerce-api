@@ -31,6 +31,26 @@ func (db *DB) RunCommerceMigrations(ctx context.Context) error {
 		return fmt.Errorf("failed to register migrations: %w", err)
 	}
 
+	// Local additive migrations for this API (must stay backwards compatible).
+	if err := manager.Register(migrations.Migration{
+		Version: "900",
+		Name:    "add_cart_item_attributes",
+		Up: func(ctx context.Context, exec migrations.Executor) error {
+			return exec.Exec(ctx, `
+				ALTER TABLE IF EXISTS cart_items
+				ADD COLUMN IF NOT EXISTS attributes JSONB;
+			`)
+		},
+		Down: func(ctx context.Context, exec migrations.Executor) error {
+			return exec.Exec(ctx, `
+				ALTER TABLE IF EXISTS cart_items
+				DROP COLUMN IF EXISTS attributes;
+			`)
+		},
+	}); err != nil {
+		return fmt.Errorf("failed to register local migrations: %w", err)
+	}
+
 	// Run migrations
 	if err := manager.Up(ctx); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
