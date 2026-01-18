@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/devchuckcamp/goauthx"
+	"github.com/devchuckcamp/gocommerce/pricing"
 
 	"github.com/devchuckcamp/gocommerce-api/internal/config"
 	"github.com/devchuckcamp/gocommerce-api/internal/database"
@@ -80,6 +81,7 @@ func main() {
 	cartRepo := repository.NewCartRepository(db.DB)
 	orderRepo := repository.NewOrderRepository(db.DB)
 	promotionRepo := repository.NewPromotionRepository(db.DB)
+	productPriceRepo := repository.NewProductPriceRepository(db.DB)
 
 	log.Println("Repositories initialized")
 
@@ -95,13 +97,21 @@ func main() {
 		brandRepo,
 	)
 
-	// Create cart service (no inventory service for now)
+	// Create price resolver service for dynamic pricing
+	priceResolverService := pricing.NewPriceResolverService(
+		productPriceRepo,
+		productRepo,
+		variantRepo,
+	)
+	priceResolverAdapter := pricing.NewCartPriceResolverAdapter(priceResolverService)
+
+	// Create cart service with price resolver (no inventory service for now)
 	cartService := services.NewCartService(
 		cartRepo,
 		productRepo,
 		variantRepo,
 		nil, // inventoryService
-	)
+	).WithPriceResolver(priceResolverAdapter)
 
 	// Create pricing service (no shipping calculator for now)
 	pricingService := services.NewPricingService(

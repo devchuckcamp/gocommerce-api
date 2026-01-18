@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/devchuckcamp/gocommerce/migrations"
 )
@@ -80,7 +81,82 @@ func (db *DB) SeedCommerce(ctx context.Context) error {
 		return fmt.Errorf("failed to run seeds: %w", err)
 	}
 
+	// Seed local ProductPrice data for dynamic pricing
+	if err := db.seedProductPrices(); err != nil {
+		return fmt.Errorf("failed to seed product prices: %w", err)
+	}
+
 	log.Println("✓ Database seeded successfully")
+	return nil
+}
+
+// seedProductPrices seeds sample product prices with date-windowed pricing
+func (db *DB) seedProductPrices() error {
+	// Check if we already have product prices
+	var count int64
+	db.Model(&ProductPrice{}).Count(&count)
+	if count > 0 {
+		return nil // Already seeded
+	}
+
+	// Get existing products to create prices for
+	var products []Product
+	if err := db.Limit(3).Find(&products).Error; err != nil {
+		return fmt.Errorf("failed to fetch products: %w", err)
+	}
+
+	if len(products) == 0 {
+		log.Println("  → No products found, skipping product price seeding")
+		return nil
+	}
+
+	now := time.Now()
+	oneMonthLater := now.AddDate(0, 1, 0)
+	threeMonthsLater := now.AddDate(0, 3, 0)
+
+	// Create sale prices for existing products (10% off)
+	for i, product := range products {
+		salePrice := int64(float64(product.BasePrice) * 0.9) // 10% off
+
+		var validTo *time.Time
+		var priceType string
+		var priority int
+
+		if i == 0 {
+			validTo = &oneMonthLater
+			priceType = "sale"
+			priority = 10
+		} else if i == 1 {
+			validTo = &threeMonthsLater
+			priceType = "clearance"
+			priority = 20
+		} else {
+			validTo = &oneMonthLater
+			priceType = "sale"
+			priority = 5
+		}
+
+		productPrice := ProductPrice{
+			ID:            fmt.Sprintf("price-%d", i+1),
+			ProductID:     product.ID,
+			VariantID:     nil,
+			PriceAmount:   salePrice,
+			PriceCurrency: product.Currency,
+			ValidFrom:     &now,
+			ValidTo:       validTo,
+			Priority:      priority,
+			PriceType:     priceType,
+			IsActive:      true,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+
+		if err := db.Create(&productPrice).Error; err != nil {
+			return fmt.Errorf("failed to create product price for %s: %w", product.Name, err)
+		}
+	}
+
+	log.Printf("  → Product prices seeded for %d products", len(products))
 	return nil
 }
 

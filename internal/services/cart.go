@@ -9,7 +9,7 @@ import (
 
 // CartService holds the gocommerce cart service
 type CartService struct {
-	cart.Service
+	*cart.CartService
 }
 
 // NewCartService creates a new CartService using gocommerce domain service
@@ -28,6 +28,12 @@ func NewCartService(
 	)
 
 	return &CartService{
-		Service: svc,
+		CartService: svc,
 	}
+}
+
+// WithPriceResolver attaches an optional price resolver for dynamic pricing
+func (s *CartService) WithPriceResolver(resolver cart.PriceResolver) *CartService {
+	s.CartService.WithPriceResolver(resolver)
+	return s
 }

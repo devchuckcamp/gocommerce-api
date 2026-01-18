@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/devchuckcamp/goauthx v0.0.2
-	github.com/devchuckcamp/gocommerce v0.0.2
+	github.com/devchuckcamp/gocommerce v0.0.4
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1

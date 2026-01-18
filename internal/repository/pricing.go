@@ -12,6 +12,161 @@ import (
 	"github.com/devchuckcamp/gocommerce/pricing"
 )
 
+// ProductPriceRepository implements pricing.ProductPriceRepository using GORM
+type ProductPriceRepository struct {
+	db *gorm.DB
+}
+
+// NewProductPriceRepository creates a new ProductPriceRepository
+func NewProductPriceRepository(db *gorm.DB) *ProductPriceRepository {
+	return &ProductPriceRepository{db: db}
+}
+
+// FindByID finds a product price by ID
+func (r *ProductPriceRepository) FindByID(ctx context.Context, id string) (*pricing.ProductPrice, error) {
+	var dbPrice database.ProductPrice
+	if err := r.db.WithContext(ctx).First(&dbPrice, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("product price not found")
+		}
+		return nil, err
+	}
+	return r.toDomain(&dbPrice), nil
+}
+
+// FindActiveForProduct finds all active prices for a product
+func (r *ProductPriceRepository) FindActiveForProduct(ctx context.Context, productID string) ([]*pricing.ProductPrice, error) {
+	var dbPrices []database.ProductPrice
+	if err := r.db.WithContext(ctx).
+		Where("product_id = ? AND is_active = ?", productID, true).
+		Order("priority DESC").
+		Find(&dbPrices).Error; err != nil {
+		return nil, err
+	}
+	return r.toDomainList(dbPrices), nil
+}
+
+// FindActiveForVariant finds all active prices for a variant
+func (r *ProductPriceRepository) FindActiveForVariant(ctx context.Context, variantID string) ([]*pricing.ProductPrice, error) {
+	var dbPrices []database.ProductPrice
+	if err := r.db.WithContext(ctx).
+		Where("variant_id = ? AND is_active = ?", variantID, true).
+		Order("priority DESC").
+		Find(&dbPrices).Error; err != nil {
+		return nil, err
+	}
+	return r.toDomainList(dbPrices), nil
+}
+
+// FindEffectivePrice finds the effective price for a product/variant at a given time
+func (r *ProductPriceRepository) FindEffectivePrice(ctx context.Context, productID string, variantID *string, at time.Time) (*pricing.ProductPrice, error) {
+	var dbPrice database.ProductPrice
+	query := r.db.WithContext(ctx).
+		Where("product_id = ? AND is_active = ?", productID, true).
+		Where("(valid_from IS NULL OR valid_from <= ?)", at).
+		Where("(valid_to IS NULL OR valid_to >= ?)", at)
+
+	if variantID != nil {
+		query = query.Where("variant_id = ?", *variantID)
+	} else {
+		query = query.Where("variant_id IS NULL")
+	}
+
+	if err := query.Order("priority DESC").First(&dbPrice).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil // No effective price found
+		}
+		return nil, err
+	}
+	return r.toDomain(&dbPrice), nil
+}
+
+// FindEffectivePrices finds effective prices for multiple products at a given time
+func (r *ProductPriceRepository) FindEffectivePrices(ctx context.Context, productIDs []string, at time.Time) (map[string]*pricing.ProductPrice, error) {
+	result := make(map[string]*pricing.ProductPrice)
+	if len(productIDs) == 0 {
+		return result, nil
+	}
+
+	var dbPrices []database.ProductPrice
+	if err := r.db.WithContext(ctx).
+		Where("product_id IN ? AND is_active = ?", productIDs, true).
+		Where("variant_id IS NULL"). // Base product prices only
+		Where("(valid_from IS NULL OR valid_from <= ?)", at).
+		Where("(valid_to IS NULL OR valid_to >= ?)", at).
+		Order("priority DESC").
+		Find(&dbPrices).Error; err != nil {
+		return nil, err
+	}
+
+	// Group by product_id, keeping highest priority (first due to ORDER BY)
+	for _, dbPrice := range dbPrices {
+		if _, exists := result[dbPrice.ProductID]; !exists {
+			result[dbPrice.ProductID] = r.toDomain(&dbPrice)
+		}
+	}
+	return result, nil
+}
+
+// Save saves a product price
+func (r *ProductPriceRepository) Save(ctx context.Context, price *pricing.ProductPrice) error {
+	dbPrice := r.toDatabase(price)
+	return r.db.WithContext(ctx).Save(dbPrice).Error
+}
+
+// Delete deletes a product price by ID
+func (r *ProductPriceRepository) Delete(ctx context.Context, id string) error {
+	return r.db.WithContext(ctx).Delete(&database.ProductPrice{}, "id = ?", id).Error
+}
+
+// DeleteByProductID deletes all prices for a product
+func (r *ProductPriceRepository) DeleteByProductID(ctx context.Context, productID string) error {
+	return r.db.WithContext(ctx).Delete(&database.ProductPrice{}, "product_id = ?", productID).Error
+}
+
+// Helper methods for ProductPriceRepository
+
+func (r *ProductPriceRepository) toDomain(dbPrice *database.ProductPrice) *pricing.ProductPrice {
+	return &pricing.ProductPrice{
+		ID:        dbPrice.ID,
+		ProductID: dbPrice.ProductID,
+		VariantID: dbPrice.VariantID,
+		Price:     database.Int64ToMoney(dbPrice.PriceAmount, dbPrice.PriceCurrency),
+		ValidFrom: dbPrice.ValidFrom,
+		ValidTo:   dbPrice.ValidTo,
+		Priority:  dbPrice.Priority,
+		PriceType: pricing.PriceType(dbPrice.PriceType),
+		IsActive:  dbPrice.IsActive,
+		CreatedAt: dbPrice.CreatedAt,
+		UpdatedAt: dbPrice.UpdatedAt,
+	}
+}
+
+func (r *ProductPriceRepository) toDomainList(dbPrices []database.ProductPrice) []*pricing.ProductPrice {
+	prices := make([]*pricing.ProductPrice, len(dbPrices))
+	for i, dbPrice := range dbPrices {
+		prices[i] = r.toDomain(&dbPrice)
+	}
+	return prices
+}
+
+func (r *ProductPriceRepository) toDatabase(price *pricing.ProductPrice) *database.ProductPrice {
+	return &database.ProductPrice{
+		ID:            price.ID,
+		ProductID:     price.ProductID,
+		VariantID:     price.VariantID,
+		PriceAmount:   price.Price.Amount,
+		PriceCurrency: price.Price.Currency,
+		ValidFrom:     price.ValidFrom,
+		ValidTo:       price.ValidTo,
+		Priority:      price.Priority,
+		PriceType:     string(price.PriceType),
+		IsActive:      price.IsActive,
+		CreatedAt:     price.CreatedAt,
+		UpdatedAt:     price.UpdatedAt,
+	}
+}
+
 // PromotionRepository implements pricing.PromotionRepository using GORM
 type PromotionRepository struct {
 	db *gorm.DB

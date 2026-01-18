@@ -114,6 +114,22 @@ type Order struct {
 	UpdatedAt       time.Time `gorm:"not null"`
 }
 
+// ProductPrice represents a time-bounded price for a product or variant
+type ProductPrice struct {
+	ID            string     `gorm:"primaryKey;column:id;size:255"`
+	ProductID     string     `gorm:"column:product_id;size:255;not null;index"`
+	VariantID     *string    `gorm:"column:variant_id;size:255;index"`
+	PriceAmount   int64      `gorm:"column:price_amount;not null"`
+	PriceCurrency string     `gorm:"column:price_currency;size:3;not null"`
+	ValidFrom     *time.Time `gorm:"column:valid_from;index"`
+	ValidTo       *time.Time `gorm:"column:valid_to;index"`
+	Priority      int        `gorm:"column:priority;not null;default:0;index"`
+	PriceType     string     `gorm:"column:price_type;size:50;not null;default:'regular'"`
+	IsActive      bool       `gorm:"column:is_active;not null;default:true;index"`
+	CreatedAt     time.Time  `gorm:"column:created_at;not null"`
+	UpdatedAt     time.Time  `gorm:"column:updated_at;not null"`
+}
+
 // Promotion represents a discount promotion in the database
 type Promotion struct {
 	ID                 string    `gorm:"primaryKey;size:36"`
