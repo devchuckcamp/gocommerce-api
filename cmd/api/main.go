@@ -89,13 +89,13 @@ func main() {
 	// Tax calculator (8.75% tax rate for example)
 	taxCalculator := services.NewSimpleTaxCalculator(0.0875)
 
-	// Create catalog service
+	// Create catalog service with sale price resolver
 	catalogService := services.NewCatalogService(
 		productRepo,
 		variantRepo,
 		categoryRepo,
 		brandRepo,
-	)
+	).WithSalePriceResolver(productPriceRepo)
 
 	// Create price resolver service for dynamic pricing
 	priceResolverService := pricing.NewPriceResolverService(
