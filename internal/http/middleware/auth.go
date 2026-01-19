@@ -171,3 +171,161 @@ func GetUserRoles(c *gin.Context) ([]string, bool) {
 	r, ok := roles.([]string)
 	return r, ok
 }
+
+// UserIDExtractor is a function type that extracts a resource owner's user ID from the request
+type UserIDExtractor func(c *gin.Context) (string, error)
+
+// RequirePermission checks if the authenticated user has a specific permission
+func (m *AuthMiddleware) RequirePermission(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetUserID(c)
+		if !exists {
+			response.Unauthorized(c, "Authentication required")
+			c.Abort()
+			return
+		}
+
+		hasPermission, err := m.authService.HasPermission(c.Request.Context(), userID, permission)
+		if err != nil {
+			response.InternalServerError(c, "Failed to check permissions")
+			c.Abort()
+			return
+		}
+
+		if !hasPermission {
+			response.Forbidden(c, "Insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireAnyPermission checks if the authenticated user has any of the specified permissions
+func (m *AuthMiddleware) RequireAnyPermission(permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetUserID(c)
+		if !exists {
+			response.Unauthorized(c, "Authentication required")
+			c.Abort()
+			return
+		}
+
+		hasAny, err := m.authService.HasAnyPermission(c.Request.Context(), userID, permissions)
+		if err != nil {
+			response.InternalServerError(c, "Failed to check permissions")
+			c.Abort()
+			return
+		}
+
+		if !hasAny {
+			response.Forbidden(c, "Insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireAllPermissions checks if the authenticated user has all of the specified permissions
+func (m *AuthMiddleware) RequireAllPermissions(permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetUserID(c)
+		if !exists {
+			response.Unauthorized(c, "Authentication required")
+			c.Abort()
+			return
+		}
+
+		hasAll, err := m.authService.HasAllPermissions(c.Request.Context(), userID, permissions)
+		if err != nil {
+			response.InternalServerError(c, "Failed to check permissions")
+			c.Abort()
+			return
+		}
+
+		if !hasAll {
+			response.Forbidden(c, "Insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireOwnerOrRole checks if the user owns the resource OR has one of the specified roles
+func (m *AuthMiddleware) RequireOwnerOrRole(getOwnerID UserIDExtractor, roles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetUserID(c)
+		if !exists {
+			response.Unauthorized(c, "Authentication required")
+			c.Abort()
+			return
+		}
+
+		// Check if user is the owner
+		ownerID, err := getOwnerID(c)
+		if err == nil && ownerID == userID {
+			c.Next()
+			return
+		}
+
+		// If not owner, check if user has any of the required roles
+		userRoles, ok := GetUserRoles(c)
+		if !ok {
+			response.Forbidden(c, "Insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		for _, userRole := range userRoles {
+			for _, requiredRole := range roles {
+				if userRole == requiredRole {
+					c.Next()
+					return
+				}
+			}
+		}
+
+		response.Forbidden(c, "Insufficient permissions")
+		c.Abort()
+	}
+}
+
+// RequireOwnerOrPermission checks if the user owns the resource OR has the specified permission
+func (m *AuthMiddleware) RequireOwnerOrPermission(getOwnerID UserIDExtractor, permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := GetUserID(c)
+		if !exists {
+			response.Unauthorized(c, "Authentication required")
+			c.Abort()
+			return
+		}
+
+		// Check if user is the owner
+		ownerID, err := getOwnerID(c)
+		if err == nil && ownerID == userID {
+			c.Next()
+			return
+		}
+
+		// If not owner, check if user has the required permission
+		hasPermission, err := m.authService.HasPermission(c.Request.Context(), userID, permission)
+		if err != nil {
+			response.InternalServerError(c, "Failed to check permissions")
+			c.Abort()
+			return
+		}
+
+		if !hasPermission {
+			response.Forbidden(c, "Insufficient permissions")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}

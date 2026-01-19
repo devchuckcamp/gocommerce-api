@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/devchuckcamp/goauthx"
 	"github.com/gin-gonic/gin"
 
 	"github.com/devchuckcamp/gocommerce-api/internal/http/middleware"
@@ -25,12 +26,12 @@ func NewOrderHandler(orderService *services.OrderService, cartService *services.
 
 // CreateOrderRequest represents the request to create an order
 type CreateOrderRequest struct {
-	ShippingAddress  AddressRequest `json:"shipping_address" binding:"required"`
+	ShippingAddress  AddressRequest  `json:"shipping_address" binding:"required"`
 	BillingAddress   *AddressRequest `json:"billing_address"`
-	PaymentMethodID  string         `json:"payment_method_id"`
-	PromotionCodes   []string       `json:"promotion_codes"`
-	ShippingMethodID string         `json:"shipping_method_id"`
-	Notes            string         `json:"notes"`
+	PaymentMethodID  string          `json:"payment_method_id"`
+	PromotionCodes   []string        `json:"promotion_codes"`
+	ShippingMethodID string          `json:"shipping_method_id"`
+	Notes            string          `json:"notes"`
 }
 
 // AddressRequest represents an address
@@ -174,13 +175,11 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 // GetOrder retrieves a specific order by ID
 // GET /orders/:id
 func (h *OrderHandler) GetOrder(c *gin.Context) {
-	_, _ = middleware.GetUserID(c)
-	// Temporarily allow unauthenticated access for testing
-	// userID, exists := middleware.GetUserID(c)
-	// if !exists {
-	// 	response.Unauthorized(c, "User not authenticated")
-	// 	return
-	// }
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
 
 	orderID := c.Param("id")
 	if orderID == "" {
@@ -198,11 +197,31 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 		return
 	}
 
-	// Temporarily disabled: Ensure the order belongs to the requesting user
-	// if order.UserID != userID {
-	// 	response.Forbidden(c, "You don't have permission to view this order")
-	// 	return
-	// }
+	// Check if user owns the order or has support/admin role
+	if order.UserID != userID {
+		// Allow admin, manager, or customer experience roles to view any order
+		if !hasAnyRole(c, string(goauthx.RoleAdmin), string(goauthx.RoleManager), string(goauthx.RoleCustomerExperience)) {
+			response.Forbidden(c, "You don't have permission to view this order")
+			return
+		}
+	}
 
 	response.Success(c, order)
+}
+
+// hasAnyRole checks if the user has any of the specified roles
+func hasAnyRole(c *gin.Context, roles ...string) bool {
+	userRoles, ok := middleware.GetUserRoles(c)
+	if !ok {
+		return false
+	}
+
+	for _, userRole := range userRoles {
+		for _, requiredRole := range roles {
+			if userRole == requiredRole {
+				return true
+			}
+		}
+	}
+	return false
 }

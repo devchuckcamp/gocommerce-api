@@ -52,6 +52,15 @@ func main() {
 		log.Println("✓ goauthx migrations completed successfully")
 	}
 
+	// Seed RBAC roles and permissions
+	log.Println("Seeding RBAC roles and permissions...")
+	seeder := goauthx.NewSeeder(authStore)
+	if err := seeder.SeedAll(context.Background()); err != nil {
+		log.Printf("Warning: RBAC seeding error: %v", err)
+	} else {
+		log.Println("✓ RBAC roles and permissions seeded successfully")
+	}
+
 	// Run gocommerce migrations
 	log.Println("Running gocommerce migrations...")
 	if err := db.RunCommerceMigrations(context.Background()); err != nil {
@@ -133,6 +142,8 @@ func main() {
 	// Create HTTP server
 	server := httpserver.NewServer(
 		authService,
+		authStore,
+		seeder,
 		catalogService,
 		cartService,
 		orderService,

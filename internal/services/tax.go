@@ -24,19 +24,19 @@ func (c *SimpleTaxCalculator) Calculate(ctx context.Context, req tax.Calculation
 	if len(req.LineItems) > 0 {
 		currency = req.LineItems[0].Amount.Currency
 	}
-	
+
 	var subtotal int64
 	lineItemTaxes := make([]tax.LineItemTax, len(req.LineItems))
-	
+
 	for i, item := range req.LineItems {
 		if !item.IsTaxable {
 			continue
 		}
-		
+
 		itemTotal := item.Amount.Amount * int64(item.Quantity)
 		itemTax := int64(float64(itemTotal) * c.rate)
 		subtotal += itemTotal
-		
+
 		lineItemTaxes[i] = tax.LineItemTax{
 			LineItemID: item.ID,
 			TaxAmount:  money.Money{Amount: itemTax, Currency: currency},
@@ -52,7 +52,7 @@ func (c *SimpleTaxCalculator) Calculate(ctx context.Context, req tax.Calculation
 
 	// Calculate shipping tax
 	shippingTax := int64(float64(req.ShippingCost.Amount) * c.rate)
-	totalTax := int64(float64(subtotal) * c.rate) + shippingTax
+	totalTax := int64(float64(subtotal)*c.rate) + shippingTax
 
 	result := &tax.CalculationResult{
 		TotalTax: money.Money{Amount: totalTax, Currency: currency},

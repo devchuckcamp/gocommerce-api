@@ -17,6 +17,8 @@ type Server struct {
 // NewServer creates a new HTTP server
 func NewServer(
 	authService *goauthx.Service,
+	authStore goauthx.Store,
+	authSeeder *goauthx.Seeder,
 	catalogService *services.CatalogService,
 	cartService *services.CartService,
 	orderService *services.OrderService,
@@ -36,12 +38,13 @@ func NewServer(
 	catalogHandler := handlers.NewCatalogHandler(catalogService)
 	cartHandler := handlers.NewCartHandler(cartService)
 	orderHandler := handlers.NewOrderHandler(orderService, cartService)
+	adminHandler := handlers.NewAdminHandler(authService, authStore, authSeeder)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 
 	// Register routes
-	setupRoutes(router, authHandler, catalogHandler, cartHandler, orderHandler, authMiddleware)
+	setupRoutes(router, authHandler, catalogHandler, cartHandler, orderHandler, adminHandler, authMiddleware)
 
 	return &Server{
 		router: router,
@@ -55,6 +58,7 @@ func setupRoutes(
 	catalogHandler *handlers.CatalogHandler,
 	cartHandler *handlers.CartHandler,
 	orderHandler *handlers.OrderHandler,
+	adminHandler *handlers.AdminHandler,
 	authMiddleware *middleware.AuthMiddleware,
 ) {
 	// Health check
@@ -113,6 +117,45 @@ func setupRoutes(
 		orders.POST("", orderHandler.CreateOrder)
 		orders.GET("", orderHandler.ListOrders)
 		orders.GET("/:id", orderHandler.GetOrder)
+	}
+
+	// Admin routes (protected - requires admin, manager, or customer_experience role)
+	admin := v1.Group("/admin")
+	admin.Use(authMiddleware.Authenticate())
+	admin.Use(authMiddleware.RequireAnyRole(string(goauthx.RoleAdmin), string(goauthx.RoleManager), string(goauthx.RoleCustomerExperience)))
+	{
+		// Role management
+		roles := admin.Group("/roles")
+		{
+			roles.GET("", adminHandler.ListRoles)
+			roles.POST("", adminHandler.CreateRole)
+			roles.GET("/:id", adminHandler.GetRole)
+			roles.PUT("/:id", adminHandler.UpdateRole)
+			roles.DELETE("/:id", adminHandler.DeleteRole)
+
+			// Role permissions
+			roles.GET("/:id/permissions", adminHandler.GetRolePermissions)
+			roles.POST("/:id/permissions", adminHandler.GrantPermissionToRole)
+			roles.DELETE("/:id/permissions/:permId", adminHandler.RevokePermissionFromRole)
+		}
+
+		// Permission management (admin only for sensitive operations)
+		permissions := admin.Group("/permissions")
+		{
+			permissions.GET("", adminHandler.ListPermissions)
+			permissions.POST("", adminHandler.CreatePermission)
+			permissions.GET("/:id", adminHandler.GetPermission)
+			permissions.PUT("/:id", adminHandler.UpdatePermission)
+			permissions.DELETE("/:id", adminHandler.DeletePermission)
+		}
+
+		// User role assignments
+		users := admin.Group("/users")
+		{
+			users.GET("/:id/roles", adminHandler.GetUserRoles)
+			users.POST("/:id/roles", adminHandler.AssignRoleToUser)
+			users.DELETE("/:id/roles/:roleId", adminHandler.RemoveRoleFromUser)
+		}
 	}
 }
 

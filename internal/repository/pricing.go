@@ -280,13 +280,13 @@ func (r *PromotionRepository) toDatabase(promotion *pricing.Promotion) *database
 	var discountPercentage float64
 	var discountAmount int64
 	var currency string = "USD"
-	
+
 	if promotion.DiscountType == "percentage" {
 		discountPercentage = promotion.Value
 	} else {
 		discountAmount = int64(promotion.Value)
 	}
-	
+
 	var minPurchase, maxDiscount int64
 	if promotion.MinPurchase != nil {
 		minPurchase = database.MoneyToInt64(*promotion.MinPurchase)

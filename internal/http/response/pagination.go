@@ -21,18 +21,18 @@ type PaginationMeta struct {
 // GetPaginationParams extracts and validates pagination parameters from query string
 func GetPaginationParams(c *gin.Context) PaginationParams {
 	var params PaginationParams
-	
+
 	// Set defaults
 	params.Page = 1
 	params.PageSize = 20
-	
+
 	// Bind query parameters
 	if err := c.ShouldBindQuery(&params); err != nil {
 		// Use defaults if binding fails
 		params.Page = 1
 		params.PageSize = 20
 	}
-	
+
 	return params
 }
 
@@ -52,7 +52,7 @@ func NewPaginationMeta(page, pageSize int, totalItems int64) PaginationMeta {
 	if int(totalItems)%pageSize > 0 {
 		totalPages++
 	}
-	
+
 	return PaginationMeta{
 		Page:       page,
 		PageSize:   pageSize,
