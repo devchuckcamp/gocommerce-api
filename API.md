@@ -1,5 +1,7 @@
 # API Documentation
 
+> **Note:** For complete route documentation including **Admin RBAC endpoints** and **role/permission requirements**, see [ROUTES.md](ROUTES.md).
+
 ## Base URL
 ```
 http://localhost:8080/api/v1

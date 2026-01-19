@@ -8,31 +8,36 @@ A production-ready Go E-Commerce API that integrates:
 
 ## Core Packages
 
-### 🔐 [goauthx v0.0.2](https://github.com/devchuckcamp/goauthx)
+### 🔐 [goauthx v0.0.3](https://github.com/devchuckcamp/goauthx)
 Authentication and authorization library with:
 - JWT token management (access & refresh)
 - Google OAuth 2.0 integration
-- Role-based access control (RBAC)
+- Role-based access control (RBAC) with permissions
+- Admin API for role/permission management
 - User management with email verification
 - Password reset functionality
 - Multi-database support (PostgreSQL, MySQL, SQL Server)
 
-### 🛒 [gocommerce v0.0.1](https://github.com/devchuckcamp/gocommerce)
+### 🛒 [gocommerce v0.0.5](https://github.com/devchuckcamp/gocommerce)
 E-commerce domain logic library with:
 - Catalog management (products, variants, categories, brands)
 - Shopping cart with persistence
 - Order processing and management
-- Pricing and promotions
+- Pricing and promotions with date-windowed sale prices
 - Tax calculations
+- **Inventory management** (stock levels, reservations, reorder points)
+- **Supplier management** (multi-supplier per product, cost tracking)
+- **Inventory audit logging** (stock_in, stock_out, adjustments, transfers)
 - Clean domain-driven design
 
 ## Features
 
-### Authentication (powered by goauthx)
+### Authentication & Authorization (powered by goauthx)
 - ✅ User registration and login with JWT tokens
 - ✅ **Google OAuth 2.0** - Sign in with Google
 - ✅ Access token & refresh token management
-- ✅ Role-based access control (RBAC)
+- ✅ Role-based access control (RBAC) with permissions
+- ✅ **Admin API**: Role/permission management, user role assignments
 - ✅ Protected routes with middleware
 - ✅ User profile management
 
@@ -42,7 +47,8 @@ E-commerce domain logic library with:
 - ✅ **Pagination**: All listing endpoints (products, categories, brands, orders)
 - ✅ **Shopping Cart**: Add/update/remove items, cart persistence
 - ✅ **Orders**: Create orders from cart, order history with pagination
-- ✅ **Pricing**: Tax calculation, promotion support
+- ✅ **Pricing**: Tax calculation, promotion support, date-windowed sale prices
+- ✅ **Inventory Ready**: Database tables for stock levels, reservations, suppliers
 - ✅ Clean domain-driven architecture
 
 ### Technical Features
@@ -88,6 +94,7 @@ github.com/devchuckcamp/gocommerce-api/
 │   │   │   ├── recovery.go         # Panic recovery
 │   │   │   └── cors.go             # CORS middleware
 │   │   ├── handlers/
+│   │   │   ├── admin.go            # Admin RBAC handlers (roles, permissions, users)
 │   │   │   ├── auth.go             # Auth + Google OAuth handlers
 │   │   │   ├── catalog.go          # Catalog handlers with pagination
 │   │   │   ├── cart.go             # Cart handlers
@@ -109,6 +116,7 @@ github.com/devchuckcamp/gocommerce-api/
 ├── go.sum                          # Dependency checksums
 ├── GOOGLE_OAUTH.md                 # Google OAuth setup guide
 ├── README.md                       # This file
+├── ROUTES.md                       # Complete API routes with permissions
 ├── setup.sh                        # Local development setup
 ├── stop.sh                         # Local process stop script
 └── test-oauth.html                 # OAuth testing page
@@ -219,43 +227,27 @@ The API will be available at `http://localhost:8080`
 
 ## API Endpoints
 
-### Authentication
+> **Complete API documentation with request/response examples, authentication requirements, and role-based permissions is available in [ROUTES.md](ROUTES.md).**
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/v1/auth/register` | Register a new user | No |
-| POST | `/api/v1/auth/login` | Login | No |
-| POST | `/api/v1/auth/refresh` | Refresh access token | No |
-| GET | `/api/v1/auth/profile` | Get user profile | Yes |
-| POST | `/api/v1/auth/logout` | Logout | Yes |
+### Endpoint Summary
 
-### Catalog (Public)
+| Category | Routes | Auth Required | Roles |
+|----------|--------|---------------|-------|
+| Health | `GET /health` | No | - |
+| Auth | 6 endpoints | Mixed | - |
+| Catalog | 5 endpoints | No | - |
+| Cart | 5 endpoints | Yes | Any user |
+| Orders | 3 endpoints | Yes | Any user / Admin |
+| Admin RBAC | 16 endpoints | Yes | admin, manager, customer_experience |
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/v1/catalog/products` | List all products | No |
-| GET | `/api/v1/catalog/products/:id` | Get product details | No |
-| GET | `/api/v1/catalog/products/category/:id` | Products by category | No |
-| GET | `/api/v1/catalog/categories` | List all categories | No |
-| GET | `/api/v1/catalog/brands` | List all brands | No |
+**Total: 37 API endpoints**
 
-### Cart (Protected)
+For detailed documentation including:
+- Request/response formats with examples
+- Role and permission requirements per endpoint
+- Error codes and handling
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/v1/cart` | Get current cart | Yes |
-| POST | `/api/v1/cart/items` | Add item to cart | Yes |
-| PATCH | `/api/v1/cart/items/:id` | Update item quantity | Yes |
-| DELETE | `/api/v1/cart/items/:id` | Remove item from cart | Yes |
-| DELETE | `/api/v1/cart` | Clear cart | Yes |
-
-### Orders (Protected)
-
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/v1/orders` | Create order from cart | Yes |
-| GET | `/api/v1/orders` | List user's orders | Yes |
-| GET | `/api/v1/orders/:id` | Get order details | Yes |
+See **[ROUTES.md](ROUTES.md)**
 
 ## Usage Examples
 
@@ -447,6 +439,12 @@ Creates e-commerce domain tables:
 - `carts` - Shopping carts
 - `cart_items` - Cart line items
 - `orders` - Customer orders
+- `product_prices` - Date-windowed sale prices
+- `suppliers` - Supplier management (v0.0.5)
+- `product_suppliers` - Product-supplier relationships (v0.0.5)
+- `inventory_levels` - Stock tracking (on_hand, reserved, available) (v0.0.5)
+- `inventory_suppliers` - Supplier-specific inventory (v0.0.5)
+- `inventory_activities` - Inventory audit logging (v0.0.5)
 - `gocommerce_migrations` - Migration tracking
 
 ### How Migrations Work
@@ -582,7 +580,10 @@ For detailed integration examples and troubleshooting, see [GOOGLE_OAUTH.md](GOO
 3. Apply authentication middleware if needed
 
 ### Adding Inventory Management
-Implement the `inventory.Service` interface from gocommerce and inject it into services.
+Database tables for inventory are already created by gocommerce v0.0.5 migrations (suppliers, inventory_levels, inventory_activities). To enable inventory features:
+1. Create repository implementations for inventory tables
+2. Implement the `inventory.Service` interface from gocommerce
+3. Inject the service into cart and order services (currently `nil`)
 
 ### Adding Payment Processing
 Implement the `payments.Gateway` interface from gocommerce and inject it into the order service.
